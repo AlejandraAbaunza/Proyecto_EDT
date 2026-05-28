@@ -25,8 +25,8 @@ for _, row in gdf.iterrows():
 
     geom = [row.geometry]
 
-    # OJO: nombre de columna de clase (puede variar)
-    label = row.iloc[-1]
+    # mombre de columna de clase (puede variar)
+    label = row["macroclass"]
 
     out_image, out_transform = mask(src, geom, crop=True)
 
