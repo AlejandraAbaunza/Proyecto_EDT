@@ -1,11 +1,17 @@
 import pandas as pd
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import (
+    train_test_split,
+    cross_val_score,
+    StratifiedKFold
+)
+
 from sklearn.metrics import (
     confusion_matrix,
     accuracy_score,
     f1_score,
-    classification_report,
+    precision_score,
+    recall_score,
     cohen_kappa_score
 )
 
@@ -21,78 +27,174 @@ from sklearn.naive_bayes import GaussianNB
 # -------------------------
 df = pd.read_csv("dataset.tsv", sep="\t")
 
-print("Columnas:", df.columns)
+# -------------------------
+# 2. Features y target
+# -------------------------
+X = df[
+    [
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "B6",
+        "B7",
+        "B8", 
+        "B11"
+    ]
+]
 
-X = df.drop(columns=["Class"])
-y = df["Class"]
+y = df["class_id"]
 
 # -------------------------
-# 2. Split train/test
+# 3. Escalamiento
 # -------------------------
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
+# -------------------------
+# 4. Split
+# -------------------------
 X_train, X_test, y_train, y_test = train_test_split(
-    X_scaled, y,
-    test_size=0.3,
-    random_state=42
+    X_scaled,
+    y,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
 )
 
 # -------------------------
-# 3. Definir modelos
+# 5. Modelos
 # -------------------------
 models = {
-    "Decision Tree": DecisionTreeClassifier(random_state=42),
+    "Decision Tree":
+        DecisionTreeClassifier(random_state=42),
 
-    "SVM": SVC(kernel="rbf"),
+    "SVM":
+        SVC(kernel="rbf", C=1),
 
-    "ANN (MLP)": MLPClassifier(
-        hidden_layer_sizes=(100,),
-        max_iter=500,
-        random_state=42
-    ),
+    "ANN (MLP)":
+        MLPClassifier(
+            hidden_layer_sizes=(100,),
+            max_iter=1000,
+            random_state=42
+        ),
 
-    "KNN": KNeighborsClassifier(n_neighbors=5),
+    "KNN":
+        KNeighborsClassifier(n_neighbors=5),
 
-    "Naive Bayes": GaussianNB()
+    "Naive Bayes":
+        GaussianNB()
 }
 
 # -------------------------
-# 4. Evaluación
+# 6. Evaluación
 # -------------------------
 results = []
 
+cv = StratifiedKFold(
+    n_splits=5,
+    shuffle=True,
+    random_state=42
+)
+
 for name, model in models.items():
 
-    print("\n============================")
-    print("Modelo:", name)
+    print("\n" + "=" * 60)
+    print(name)
 
-    # Train
+    # Entrenamiento
     model.fit(X_train, y_train)
 
-    # Predict
+    # Predicción
     y_pred = model.predict(X_test)
 
-    # Metrics
-    cm = confusion_matrix(y_test, y_pred)
+    # Métricas
     oa = accuracy_score(y_test, y_pred)
     kappa = cohen_kappa_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred, average="weighted")
 
-    print("Confusion Matrix:\n", cm)
-    print("Overall Accuracy:", oa)
-    print("Kappa:", kappa)
-    print("F1-score:", f1)
+    precision = precision_score(
+        y_test,
+        y_pred,
+        average="weighted"
+    )
 
-    results.append([name, oa, kappa, f1])
+    recall = recall_score(
+        y_test,
+        y_pred,
+        average="weighted"
+    )
+
+    f1 = f1_score(
+        y_test,
+        y_pred,
+        average="weighted"
+    )
+
+    # Cross Validation
+    cv_scores = cross_val_score(
+        model,
+        X_scaled,
+        y,
+        cv=cv,
+        scoring="f1_weighted"
+    )
+
+    cv_mean = cv_scores.mean()
+    cv_std = cv_scores.std()
+
+    print("Accuracy:", round(oa, 4))
+    print("Kappa:", round(kappa, 4))
+    print("Precision:", round(precision, 4))
+    print("Recall:", round(recall, 4))
+    print("F1:", round(f1, 4))
+
+    #print("CV F1 Mean:", round(cv_mean, 4))
+    #print("CV F1 Std:", round(cv_std, 4))
+
+    print("Confusion Matrix:")
+    print(confusion_matrix(y_test, y_pred))
+
+    results.append([
+        name,
+        oa,
+        kappa,
+        precision,
+        recall,
+        f1#,
+        #cv_mean,
+        #cv_std
+    ])
 
 # -------------------------
-# 5. Tabla comparativa final
+# 7. Tabla final
 # -------------------------
 results_df = pd.DataFrame(
     results,
-    columns=["Model", "OA", "Kappa", "F1-score"]
+    columns=[
+        "Model",
+        "OA",
+        "Kappa",
+        "Precision",
+        "Recall",
+        "F1"#,
+        #"CV_F1_Mean",
+        #"CV_F1_Std"
+    ]
 )
 
-print("\n===== COMPARISON TABLE =====")
+results_df = results_df.sort_values(
+    #by="CV_F1_Mean",
+    by="F1",
+    ascending=False
+)
+
+print("\n")
 print(results_df)
+
+""""
+results_df.to_csv(
+    "model_comparison.csv",
+    index=False
+)
+"""
+#print(df.groupby("class_id")[["B2","B3","B4","B5","B6","B7","B8","B11"]].mean())
