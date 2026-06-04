@@ -1,4 +1,5 @@
 import pandas as pd
+import joblib
 
 from sklearn.metrics import (
     confusion_matrix,
@@ -249,3 +250,26 @@ print(
 #    "resultados_modelos.csv",
 #    index=False
 #)
+
+# --------------------------------------------------
+# 12. Entrenar modelo final con TODOS los datos
+# --------------------------------------------------
+
+X_all = df[bandas]
+y_all = df["class5"]
+
+scaler_final = StandardScaler()
+X_all_scaled = scaler_final.fit_transform(X_all)
+
+best_model = SVC(
+    kernel="rbf",
+    C=10,
+    gamma="scale"
+)
+
+best_model.fit(X_all_scaled, y_all)
+
+joblib.dump(best_model, "svm_model.pkl")
+joblib.dump(scaler_final, "scaler.pkl")
+
+print("\nModelo SVM guardado correctamente.")
